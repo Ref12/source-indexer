@@ -95,6 +95,7 @@
   <Target Name="DownloadRepositoryV2" Outputs="%(RepositoryV2.Identity)">
     <DownloadStage1Index
       RepoName="%(RepositoryV2.RepoName)"
+      BlobContainerSasUrl="$(BlobContainerSasUrl)"
       OutputDirectory="%(RepositoryV2.ExtractPath)"/>
   </Target>
 
@@ -139,11 +140,16 @@
       <SolutionToIndex Include="%(ClonedRepositoryV2.ExtractPath)\**\*.sln"/>
     </ItemGroup>
   </Target>
-
   <Target Name="BuildGenerator" Condition="!Exists('$(HtmlGeneratorExePath)')">
     <MSBuild Projects="$(SourcesDir)SourceBrowser/src/HtmlGenerator/HtmlGenerator.csproj" Targets="Restore;Build" Properties="SolutionDir=$(SourcesDir)SourceBrowser">
       <Output TaskParameter="TargetOutputs" PropertyName="HtmlGeneratorExePath"/>
     </MSBuild>
+  </Target>
+
+  <Target Name="AnalyzeV1" Outputs="%(ClonedRepository.Identity)">
+    <Error Condition="!Exists('$(CodexExePath)')" Text="Codex executable not found."/>
+
+
   </Target>
 
   <Target Name="BuildIndex" DependsOnTargets="BuildGenerator;FindBinlogs;FindSolutions">
