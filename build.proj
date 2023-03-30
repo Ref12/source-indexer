@@ -13,6 +13,9 @@
   <Target Name="Clean" DependsOnTargets="BuildTasks">
     <MSBuild Projects="src/index/index.proj" Targets="Clean" Properties="SourceIndexerTasksAssembly=$(SourceIndexerTasksAssembly)"/>
   </Target>
+  <Target Name="Analyze" DependsOnTargets="BuildTasks">
+    <MSBuild Projects="src/index/index.proj" Targets="Analyze" Properties="SourceIndexerTasksAssembly=$(SourceIndexerTasksAssembly)"/>
+  </Target>
   <Target Name="Clone" DependsOnTargets="BuildTasks">
     <MSBuild Projects="src/index/index.proj" Targets="Clone" Properties="SourceIndexerTasksAssembly=$(SourceIndexerTasksAssembly)"/>
   </Target>

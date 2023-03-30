@@ -3,6 +3,7 @@
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.props))\dir.props" />
 
   <UsingTask TaskName="DownloadStage1Index" AssemblyFile="$(SourceIndexerTasksAssembly)"/>
+  <UsingTask TaskName="OverlayDirectory" AssemblyFile="$(SourceIndexerTasksAssembly)"/>
 
   <PropertyGroup>
     <WhatIf Condition="'$(WhatIf)' != 'true'">false</WhatIf>
@@ -18,13 +19,24 @@
       <Branch>main</Branch>
       <LocalPath>$(RepositoryPath)%(Identity)/</LocalPath>
       <ServerPath>%(Url)/tree/%(Branch)/</ServerPath>
+      <DisableMsBuildWorkspace>true</DisableMsBuildWorkspace>
     </Repository>
 
     <RepositoryV2>
+      <OutputDir>$(RepositoryPath)%(Identity)/</OutputDir>
       <LocalPath>$(RepositoryPath)%(Identity)/src/</LocalPath>
-      <ExtractPath>$(RepositoryPath)%(Identity)/</ExtractPath>
+      <ExtractPath>$(RepositoryPath)%(Identity).ext/</ExtractPath>
+      <ExtractSrcPath>$(RepositoryPath)%(Identity).ext/src</ExtractSrcPath>
+      <ExtractSlnListPath>$(RepositoryPath)%(Identity)/solutions.txt</ExtractSlnListPath>
+      <DisableMsBuildWorkspace>false</DisableMsBuildWorkspace>
     </RepositoryV2>
   </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <BuildableRepository Include="@(Repository)" />
+    <ExtractedRepository Include="@(RepositoryV2)" />
+    <Repository Include="@(RepositoryV2)" />
+  </ItemGroup>
 
   <Target Name="EnsurePreconditions">
     <Error Condition="'$(OS)' != 'Windows_NT'" Text="This tool can only be run on Windows_NT."/>
@@ -74,106 +86,128 @@
           WorkingDirectory="%(Repository.LocalPath)" />
   </Target>
 
-  <Target Name="CheckoutSources" DependsOnTargets="CloneRepository" Outputs="%(Repository.Identity)">
-    <Exec Command="git checkout %(Repository.OldCommit)" WorkingDirectory="%(Repository.LocalPath)" Condition="'%(Repository.OldCommit)' != ''" />
-    <Exec Command="git checkout HEAD" WorkingDirectory="%(Repository.LocalPath)" Condition="'%(Repository.OldCommit)' == ''" />
-  </Target>
-
-  <Target Name="ResolveHashV1" Outputs="%(Repository.Identity)">
-    <Exec Command="git rev-parse HEAD 2>&amp;1" WorkingDirectory="%(Repository.LocalPath)" ConsoleToMSBuild="true">
-      <Output TaskParameter="ConsoleOutput" PropertyName="CommitHash"/>
-    </Exec>
-    <ItemGroup>
-      <ClonedRepository Include="@(Repository)">
-        <ServerPath>%(Url)/tree/$(CommitHash)/</ServerPath>
-      </ClonedRepository>
-    </ItemGroup>
-  </Target>
-
-  <Target Name="CloneV1" DependsOnTargets="CloneRepository;CheckoutSources;ResolveHashV1"/>
-
-  <Target Name="DownloadRepositoryV2" Outputs="%(RepositoryV2.Identity)">
+  <Target Name="DownloadRepositoryV2" Outputs="%(ExtractedRepository.Identity)">
     <DownloadStage1Index
-      RepoName="%(RepositoryV2.RepoName)"
+      RepoName="%(ExtractedRepository.RepoName)"
       BlobContainerSasUrl="$(BlobContainerSasUrl)"
-      OutputDirectory="%(RepositoryV2.ExtractPath)"/>
+      OutputDirectory="%(ExtractedRepository.ExtractPath)"/>
   </Target>
 
-  <Target Name="ResolveHashV2" Outputs="%(RepositoryV2.Identity)">
-    <ReadLinesFromFile File="%(RepositoryV2.ExtractPath)hash">
+  <Target Name="ResolveHash" Outputs="%(ExtractedRepository.Identity)">
+    <ReadLinesFromFile File="%(ExtractedRepository.ExtractPath)hash">
       <Output TaskParameter="Lines" PropertyName="CommitHash"/>
     </ReadLinesFromFile>
     <ItemGroup>
-      <ClonedRepositoryV2 Include="@(RepositoryV2)">
-        <ServerPath>%(Url)/tree/$(CommitHash)/</ServerPath>
-      </ClonedRepositoryV2>
+      <ExtractedRepository Commit="$(CommitHash)" />
+      <Repository Condition="'%(Identity)' == '%(ExtractedRepository.Identity)'" ResetCommit="$(CommitHash)" />
     </ItemGroup>
   </Target>
 
-  <Target Name="CloneV2" DependsOnTargets="DownloadRepositoryV2;ResolveHashV2"/>
+  <Target Name="CheckoutSources" DependsOnTargets="DownloadRepositoryV2;ResolveHash;CloneRepository" Outputs="%(Repository.Identity)">
+    <PropertyGroup>
+      <GitEnv>GIT_DIR=%(Repository.LocalPath)\.git</GitEnv>
+    </PropertyGroup>
+    <Exec Command="git reset %(Repository.ResetCommit)" WorkingDirectory="%(Repository.LocalPath)" Condition="'%(Repository.ResetCommit)' != ''"
+          EnvironmentVariables="$(GitEnv)" />
+    <Exec Command="git checkout %(Repository.OldCommit)" WorkingDirectory="%(Repository.LocalPath)" Condition="'%(Repository.OldCommit)' != ''"
+          EnvironmentVariables="$(GitEnv)" />
+    <Exec Command="git checkout HEAD" WorkingDirectory="%(Repository.LocalPath)" Condition="'%(Repository.OldCommit)' == '' AND '%(Repository.ResetCommit)' != ''"
+          EnvironmentVariables="$(GitEnv)" />
+  </Target>
+
+  <Target Name="OverlayRepository"
+          DependsOnTargets="DownloadRepositoryV2;CloneRepository;CheckoutSources"
+          Outputs="%(ExtractedRepository.Identity)">
+    <PropertyGroup>
+      <InputDir>%(ExtractedRepository.ExtractPath)</InputDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_OverlayRepo Include="@(ExtractedRepository)" />
+      <OverlaySolutionFiles Remove="@(OverlaySolutionFiles)" />
+    </ItemGroup>
+    <OverlayDirectory InputDirectory="%(ExtractedRepository.ExtractPath)" OutputDirectory="%(ExtractedRepository.OutputDir)">
+      <Output TaskParameter="SolutionFiles" ItemName="OverlaySolutionFiles" />
+    </OverlayDirectory>
+
+    <WriteLinesToFile File="%(ExtractedRepository.ExtractSlnListPath)" Lines="@(OverlaySolutionFiles)" />
+  </Target>
+
+  <Target Name="CloneV1" DependsOnTargets="CloneRepository;CheckoutSources"/>
+
+  <Target Name="CloneV2" DependsOnTargets="CloneRepository;DownloadRepositoryV2;ResolveHash;CheckoutSources;OverlayRepository"/>
 
   <Target Name="Clone" DependsOnTargets="CloneV1;CloneV2">
   </Target>
 
-  <Target Name="PrepareV1" DependsOnTargets="ResolveHashV1" Outputs="%(ClonedRepository.Identity)">
+  <Target Name="PrepareV1" Outputs="%(BuildableRepository.Identity)">
     <PropertyGroup>
-      <PrepareCommand>$([System.String]::Copy('%(ClonedRepository.PrepareCommand)').Trim())</PrepareCommand>
+      <PrepareCommand>$([System.String]::Copy('%(BuildableRepository.PrepareCommand)').Trim())</PrepareCommand>
     </PropertyGroup>
-    <Message Importance="High" Text="Preparing Repository %(ClonedRepository.Identity)"/>
-    <Exec Command="cmd /c &quot;$(PrepareCommand)&quot;" WorkingDirectory="%(ClonedRepository.LocalPath)" ContinueOnError="true" IgnoreStandardErrorWarningFormat="true" LogStandardErrorAsError="false" IgnoreExitCode="true"/>
+    <Message Importance="High" Text="Preparing Repository %(Repository.Identity)"/>
+    <Exec Command="cmd /c &quot;$(PrepareCommand)&quot;" WorkingDirectory="%(BuildableRepository.LocalPath)" ContinueOnError="true" IgnoreStandardErrorWarningFormat="true" LogStandardErrorAsError="false" IgnoreExitCode="true"/>
   </Target>
 
-  <Target Name="PrepareV2" DependsOnTargets="ResolveHashV2" Outputs="%(ClonedRepositoryV2.Identity)">
+  <Target Name="Prepare" DependsOnTargets="PrepareV1">
   </Target>
 
-  <Target Name="Prepare" DependsOnTargets="PrepareV1;PrepareV2">
-  </Target>
-
-  <Target Name="FindBinlogs" DependsOnTargets="ResolveHashV1" Outputs="%(ClonedRepository.Identity)">
+  <Target Name="FindBinlogs" Outputs="%(BuildableRepository.Identity)">
     <ItemGroup>
-      <BinlogToIndex Include="%(ClonedRepository.LocalPath)\**\*.binlog"/>
+      <_BinlogToIndexTemp Remove="@(_BinlogToIndexTemp)" />
+      <_BinlogToIndexTemp Include="%(BuildableRepository.LocalPath)\**\*.binlog" Repository="%(BuildableRepository.Identity)"/>
+      <BinlogToIndex Include="@(_BinlogToIndexTemp)" />
+    </ItemGroup>
+
+    <Warning Condition="@(_BinlogToIndexTemp->Count()) == 0" Text="No binlogs found for '%(BuildableRepository.Identity)'" />
+
+  </Target>
+
+  <Target Name="FindSolutions" Outputs="%(ExtractedRepository.Identity)">
+    <ItemGroup>
+      <_SolutionToIndexTemp Remove="@(_SolutionToIndexTemp)" />
+    </ItemGroup>
+
+    <ReadLinesFromFile File="%(ExtractedRepository.ExtractSlnListPath)">
+      <Output TaskParameter="Lines" ItemName="_SolutionToIndexTemp"/>
+    </ReadLinesFromFile>
+
+    <ItemGroup>
+      <SolutionToIndex Include="@(_SolutionToIndexTemp)" Repository="%(ExtractedRepository.Identity)" />
     </ItemGroup>
   </Target>
 
-  <Target Name="FindSolutions" DependsOnTargets="ResolveHashV2" Outputs="%(ClonedRepositoryV2.Identity)">
-    <ItemGroup>
-      <SolutionToIndex Include="%(ClonedRepositoryV2.ExtractPath)\**\*.sln"/>
-    </ItemGroup>
-  </Target>
-  <Target Name="BuildGenerator" Condition="!Exists('$(HtmlGeneratorExePath)')">
-    <MSBuild Projects="$(SourcesDir)SourceBrowser/src/HtmlGenerator/HtmlGenerator.csproj" Targets="Restore;Build" Properties="SolutionDir=$(SourcesDir)SourceBrowser">
-      <Output TaskParameter="TargetOutputs" PropertyName="HtmlGeneratorExePath"/>
-    </MSBuild>
-  </Target>
+  <Target Name="AnalyzeV1" DependsOnTargets="FindBinLogs;FindSolutions" Outputs="%(Repository.Identity)">
+    <PropertyGroup>
+      <BaseCodexCmd>"$(CodexExePath)" analyze --clean --test</BaseCodexCmd>
+      <RepoName>%(Repository.Identity)</RepoName>
+    </PropertyGroup>
 
-  <Target Name="AnalyzeV1" Outputs="%(ClonedRepository.Identity)">
+    <ItemGroup>
+      <_AnalyzeArg Remove="@(_AnalyzeArg)" />
+      <_AnalyzeArg Include="@(BinlogToIndex->WithMetadataValue('Repository', '$(RepoName)'))">
+        <CommandArg>--binLogSearchDirectory "%(FullPath)"</CommandArg>
+      </_AnalyzeArg>
+      <_AnalyzeArg Include="@(SolutionToIndex->WithMetadataValue('Repository', '$(RepoName)'))">
+        <CommandArg>--solution "%(FullPath)"</CommandArg>
+      </_AnalyzeArg>
+    </ItemGroup>
+
+    <PropertyGroup>
+      <SourceIndexCmd>$(BaseCodexCmd)</SourceIndexCmd>
+      <SourceIndexCmd Condition="%(Repository.DisableMsBuildWorkspace)">$(SourceIndexCmd) --noMsBuild</SourceIndexCmd>
+      <SourceIndexCmd>$(SourceIndexCmd) --path "%(Repository.LocalPath)"</SourceIndexCmd>
+      <SourceIndexCmd>$(SourceIndexCmd) --out "$(OutDir)/cdx/analyze/%(Repository.Identity)"</SourceIndexCmd>
+      <SourceIndexCmd>$(SourceIndexCmd) @(_AnalyzeArg -> '%(CommandArg)', ' ')</SourceIndexCmd>
+    </PropertyGroup>
+
+    <Message Text="Analysis command '$(SourceIndexCmd)'" Importance="high" />
+
     <Error Condition="!Exists('$(CodexExePath)')" Text="Codex executable not found."/>
-
-
+    <Exec Command="$(SourceIndexCmd)" Condition="(@(_AnalyzeArg->Count()) != 0) OR ('$(ForceAnalyze)' == 'true')" LogStandardErrorAsError="false"/>
   </Target>
 
-  <Target Name="BuildIndex" DependsOnTargets="BuildGenerator;FindBinlogs;FindSolutions">
-    <Error Condition="!Exists('$(HtmlGeneratorExePath)')" Text="Html generator executable not found."/>
-    <RemoveDuplicates Inputs="@(BinlogToIndex)">
-      <Output TaskParameter="Filtered" ItemName="_FilteredBinlog"/>
-    </RemoveDuplicates>
-    <RemoveDuplicates Inputs="@(SolutionToIndex)">
-      <Output TaskParameter="Filtered" ItemName="_FilteredSolution"/>
-    </RemoveDuplicates>
-    <RemoveDir Directories="$(OutDir)index/"/>
-    <WriteLinesToFile Lines="@(_FilteredBinlog -> '%(FullPath)')" File="$(OutDir)index.list" Overwrite="true"/>
-    <WriteLinesToFile Lines="@(_FilteredSolution -> '%(FullPath)')" File="$(OutDir)index.list" Overwrite="false"/>
-    <PropertyGroup>
-      <SourceIndexCmd>"$(HtmlGeneratorExePath)"</SourceIndexCmd>
-      <SourceIndexCmd>$(SourceIndexCmd) /donotincludereferencedprojects</SourceIndexCmd>
-      <SourceIndexCmd>$(SourceIndexCmd) /nobuiltinfederations</SourceIndexCmd>
-      <SourceIndexCmd>$(SourceIndexCmd) /noplugins</SourceIndexCmd>
-      <SourceIndexCmd>$(SourceIndexCmd) /out:"$(OutDir)index/"</SourceIndexCmd>
-      <SourceIndexCmd>$(SourceIndexCmd) /in:"$(OutDir)index.list"</SourceIndexCmd>
-      <SourceIndexCmd>$(SourceIndexCmd)@(ClonedRepository -> ' /serverPath:"%(LocalPath)=%(ServerPath)"', '')</SourceIndexCmd>
-      <SourceIndexCmd>$(SourceIndexCmd)@(ClonedRepositoryV2 -> ' /serverPath:"%(LocalPath)=%(ServerPath)"', '')</SourceIndexCmd>
-    </PropertyGroup>
-    <Exec Command="$(SourceIndexCmd)" LogStandardErrorAsError="false"/>
+  <Target Name="Analyze" DependsOnTargets="AnalyzeV1" />
+
+  <Target Name="BuildIndex" DependsOnTargets="Analyze">
     <Copy SourceFiles="@(OverwriteFiles)" DestinationFiles="@(OverwriteFiles -> '$(OutDir)index/%(RecursiveDir)%(Filename)%(Extension)')"/>
   </Target>
 

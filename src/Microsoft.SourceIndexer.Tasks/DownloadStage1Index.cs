@@ -57,6 +57,7 @@ namespace Microsoft.SourceIndexer.Tasks
             using Stream fileStream = blobClient.OpenRead();
             using var input = new GZipInputStream(fileStream);
             using var archive = TarArchive.CreateInputTarArchive(input, Encoding.UTF8);
+            archive.SetKeepOldFiles(keepExistingFiles: false);
             archive.ExtractContents(OutputDirectory, true); // would like this to be false, but SharpZipLib has a bug in 1.3.3
         }
     }
