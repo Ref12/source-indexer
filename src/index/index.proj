@@ -34,7 +34,7 @@
   </ItemDefinitionGroup>
 
 
-  <Target Name="EnsurePreconditions">
+  <Target Name="EnsurePreconditions" DependsOnTargets="PrepareOutput">
     <Error Condition="'$(OS)' != 'Windows_NT'" Text="This tool can only be run on Windows_NT."/>
 
     <PropertyGroup>
@@ -74,6 +74,7 @@
   <Target Name="PrepareOutput">
     <MakeDir Condition="!Exists('$(OutDir)')" Directories="$(OutDir)"/>
     <MakeDir Condition="!Exists('$(RepositoryPath)')" Directories="$(RepositoryPath)"/>
+    <MakeDir Condition="'$(AnalyzeUploadDir)' != '' AND !Exists('$(AnalyzeUploadDir)')" Directories="$(AnalyzeUploadDir)"/>
   </Target>
 
   <Target Name="CloneRepository" Condition="$(HasRepos)" Outputs="%(Repository.Identity)">
