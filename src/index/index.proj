@@ -179,6 +179,7 @@
     <PropertyGroup>
       <BaseCodexCmd>"$(CodexExePath)" analyze --clean --test</BaseCodexCmd>
       <RepoName>%(Repository.Identity)</RepoName>
+      <ThisRepoAnalyzeOutDir>$(OutDir)/cdx/analyze/%(Repository.Identity)</ThisRepoAnalyzeOutDir>
     </PropertyGroup>
 
     <ItemGroup>
@@ -192,17 +193,25 @@
     </ItemGroup>
 
     <PropertyGroup>
+
       <SourceIndexCmd>$(BaseCodexCmd)</SourceIndexCmd>
       <SourceIndexCmd Condition="%(Repository.DisableMsBuildWorkspace)">$(SourceIndexCmd) --noMsBuild</SourceIndexCmd>
       <SourceIndexCmd>$(SourceIndexCmd) --path "%(Repository.LocalPath)"</SourceIndexCmd>
-      <SourceIndexCmd>$(SourceIndexCmd) --out "$(OutDir)/cdx/analyze/%(Repository.Identity)"</SourceIndexCmd>
+      <SourceIndexCmd>$(SourceIndexCmd) --out "$(ThisRepoAnalyzeOutDir)"</SourceIndexCmd>
       <SourceIndexCmd>$(SourceIndexCmd) @(_AnalyzeArg -> '%(CommandArg)', ' ')</SourceIndexCmd>
     </PropertyGroup>
 
     <Message Text="Analysis command '$(SourceIndexCmd)'" Importance="high" />
 
+    <PropertyGroup>
+      <ShouldAnalyze>false</ShouldAnalyze>
+      <ShouldAnalyze Condition="(@(_AnalyzeArg->Count()) != 0) OR ('$(ForceAnalyze)' == 'true')">true</ShouldAnalyze>
+    </PropertyGroup>
+
     <Error Condition="!Exists('$(CodexExePath)')" Text="Codex executable not found."/>
-    <Exec Command="$(SourceIndexCmd)" Condition="(@(_AnalyzeArg->Count()) != 0) OR ('$(ForceAnalyze)' == 'true')" LogStandardErrorAsError="false"/>
+    <Exec Command="$(SourceIndexCmd)" Condition="$(ShouldAnalyze)" LogStandardErrorAsError="false"/>
+
+    <ZipDirectory Condition="$(ShouldAnalyze)" SourceDirectory="$(ThisRepoAnalyzeOutDir)" DestinationFile="$(OutDir)/cdx/analyzezips" />
   </Target>
 
   <Target Name="Analyze" DependsOnTargets="AnalyzeV1" />
