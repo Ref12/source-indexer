@@ -206,12 +206,14 @@
     <PropertyGroup>
       <ShouldAnalyze>false</ShouldAnalyze>
       <ShouldAnalyze Condition="(@(_AnalyzeArg->Count()) != 0) OR ('$(ForceAnalyze)' == 'true')">true</ShouldAnalyze>
+
+      <_AnalyzeUploadDir Condition="$(ShouldAnalyze)">$(AnalyzeUploadDir)</_AnalyzeUploadDir>
     </PropertyGroup>
 
     <Error Condition="!Exists('$(CodexExePath)')" Text="Codex executable not found."/>
     <Exec Command="$(SourceIndexCmd)" Condition="$(ShouldAnalyze)" LogStandardErrorAsError="false"/>
 
-    <ZipDirectory Condition="$(ShouldAnalyze)" SourceDirectory="$(ThisRepoAnalyzeOutDir)" DestinationFile="$(OutDir)/cdx/analyzezips" />
+    <ZipDirectory Condition="'$(_AnalyzeUploadDir)' != ''" SourceDirectory="$(ThisRepoAnalyzeOutDir)" DestinationFile="$(_AnalyzeUploadDir)" />
   </Target>
 
   <Target Name="Analyze" DependsOnTargets="AnalyzeV1" />
