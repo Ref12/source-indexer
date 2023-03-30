@@ -204,7 +204,7 @@
 
   <Target Name="AnalyzeV1" Condition="$(HasRepos)" DependsOnTargets="FindBinLogs;FindSolutions" Outputs="%(Repository.Identity)">
     <PropertyGroup>
-      <BaseCodexCmd>"$(CodexExePath)" analyze --clean --test</BaseCodexCmd>
+      <BaseCodexCmd>"$(CodexExePath)" analyze --clean </BaseCodexCmd>
       <RepoName>%(Repository.Identity)</RepoName>
       <ThisRepoAnalyzeOutDir>$(OutDir)/cdx/analyze/%(Repository.Identity)</ThisRepoAnalyzeOutDir>
     </PropertyGroup>
