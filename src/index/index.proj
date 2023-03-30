@@ -4,6 +4,7 @@
 
   <UsingTask TaskName="DownloadStage1Index" AssemblyFile="$(SourceIndexerTasksAssembly)"/>
   <UsingTask TaskName="OverlayDirectory" AssemblyFile="$(SourceIndexerTasksAssembly)"/>
+  <UsingTask TaskName="SelectGroup" AssemblyFile="$(SourceIndexerTasksAssembly)"/>
 
   <PropertyGroup>
     <WhatIf Condition="'$(WhatIf)' != 'true'">false</WhatIf>
@@ -36,15 +37,34 @@
   <Target Name="EnsurePreconditions">
     <Error Condition="'$(OS)' != 'Windows_NT'" Text="This tool can only be run on Windows_NT."/>
 
-    
-  <ItemGroup>
-    <Repository Remove="@(Repository)" Condition="'%(Identity)' != '$(SelectedRepository)' AND '$(SelectedRepository)' != ''" />
-    <RepositoryV2 Remove="@(RepositoryV2)" Condition="'%(Identity)' != '$(SelectedRepository)' AND '$(SelectedRepository)' != ''" />
+    <PropertyGroup>
+      <AgentJobNumber Condition="'$(AgentJobNumber)' == ''">1</AgentJobNumber>
+      <AgentJobCount Condition="'$(AgentJobCount)' == ''">1</AgentJobCount>
+    </PropertyGroup>
 
-    <BuildableRepository Include="@(Repository)" />
-    <ExtractedRepository Include="@(RepositoryV2)" />
-    <Repository Include="@(RepositoryV2)" />
-  </ItemGroup>
+    <SelectGroup Inputs="@(Repository);@(RepositoryV2)" GroupNumber="$(AgentJobNumber)" TotalGroups="$(AgentJobCount)">
+      <Output TaskParameter="Outputs" ItemName="_GroupRepositories" />
+    </SelectGroup>
+    
+    <ItemGroup>
+      <Repository Remove="@(_GroupRepositories)" Condition="'%(_GroupRepositories.IsSelected)' != 'true'" />
+      <RepositoryV2 Remove="@(_GroupRepositories)" Condition="'%(_GroupRepositories.IsSelected)' != 'true'" />
+
+      <BuildableRepository Include="@(Repository)" />
+      <ExtractedRepository Include="@(RepositoryV2)" />
+      <Repository Include="@(RepositoryV2)" />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <HasRepos>false</HasRepos>
+      <HasRepos Condition="@(Repository->Count()) != 0">true</HasRepos>
+
+      <HasBuildableRepos>false</HasBuildableRepos>
+      <HasBuildableRepos Condition="@(BuildableRepository->Count()) != 0">true</HasBuildableRepos>
+
+      <HasExtractedRepos>false</HasExtractedRepos>
+      <HasExtractedRepos Condition="@(ExtractedRepository->Count()) != 0">true</HasExtractedRepos>
+    </PropertyGroup>
   </Target>
 
   <Target Name="Clean">
@@ -56,7 +76,7 @@
     <MakeDir Condition="!Exists('$(RepositoryPath)')" Directories="$(RepositoryPath)"/>
   </Target>
 
-  <Target Name="CloneRepository" Outputs="%(Repository.Identity)">
+  <Target Name="CloneRepository" Condition="$(HasRepos)" Outputs="%(Repository.Identity)">
     <PropertyGroup>
       <CloneSparse>false</CloneSparse>
       <CloneSparse Condition="'%(Repository.SparseCheckout)' != ''">true</CloneSparse>
@@ -91,14 +111,14 @@
           WorkingDirectory="%(Repository.LocalPath)" />
   </Target>
 
-  <Target Name="DownloadRepositoryV2" Outputs="%(ExtractedRepository.Identity)">
+  <Target Name="DownloadExtractedRepository" Condition="$(HasExtractedRepos)" Outputs="%(ExtractedRepository.Identity)">
     <DownloadStage1Index
       RepoName="%(ExtractedRepository.RepoName)"
       BlobContainerSasUrl="$(BlobContainerSasUrl)"
       OutputDirectory="%(ExtractedRepository.ExtractPath)"/>
   </Target>
 
-  <Target Name="ResolveHash" Outputs="%(ExtractedRepository.Identity)">
+  <Target Name="ResolveHash" Condition="$(HasExtractedRepos)" Outputs="%(ExtractedRepository.Identity)">
     <ReadLinesFromFile File="%(ExtractedRepository.ExtractPath)hash">
       <Output TaskParameter="Lines" PropertyName="CommitHash"/>
     </ReadLinesFromFile>
@@ -108,7 +128,7 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="CheckoutSources" DependsOnTargets="DownloadRepositoryV2;ResolveHash;CloneRepository" Outputs="%(Repository.Identity)">
+  <Target Name="CheckoutSources" Condition="$(HasRepos)" DependsOnTargets="DownloadExtractedRepository;ResolveHash;CloneRepository" Outputs="%(Repository.Identity)">
     <PropertyGroup>
       <GitEnv>GIT_DIR=%(Repository.LocalPath)\.git</GitEnv>
     </PropertyGroup>
@@ -121,7 +141,8 @@
   </Target>
 
   <Target Name="OverlayRepository"
-          DependsOnTargets="DownloadRepositoryV2;CloneRepository;CheckoutSources"
+          Condition="$(HasExtractedRepos)"
+          DependsOnTargets="DownloadExtractedRepository;CloneRepository;CheckoutSources"
           Outputs="%(ExtractedRepository.Identity)">
     <PropertyGroup>
       <InputDir>%(ExtractedRepository.ExtractPath)</InputDir>
@@ -139,23 +160,23 @@
 
   <Target Name="CloneV1" DependsOnTargets="CloneRepository;CheckoutSources"/>
 
-  <Target Name="CloneV2" DependsOnTargets="CloneRepository;DownloadRepositoryV2;ResolveHash;CheckoutSources;OverlayRepository"/>
+  <Target Name="CloneV2" DependsOnTargets="CloneRepository;DownloadExtractedRepository;ResolveHash;CheckoutSources;OverlayRepository"/>
 
   <Target Name="Clone" DependsOnTargets="CloneV1;CloneV2">
   </Target>
 
-  <Target Name="PrepareV1" Outputs="%(BuildableRepository.Identity)">
+  <Target Name="PrepareV1" Condition="$(HasBuildableRepos)" Outputs="%(BuildableRepository.Identity)">
     <PropertyGroup>
       <PrepareCommand>$([System.String]::Copy('%(BuildableRepository.PrepareCommand)').Trim())</PrepareCommand>
     </PropertyGroup>
-    <Message Importance="High" Text="Preparing Repository %(Repository.Identity)"/>
+    <Message Importance="High" Text="Preparing Repository %(BuildableRepository.Identity)"/>
     <Exec Command="cmd /c &quot;$(PrepareCommand)&quot;" WorkingDirectory="%(BuildableRepository.LocalPath)" ContinueOnError="true" IgnoreStandardErrorWarningFormat="true" LogStandardErrorAsError="false" IgnoreExitCode="true"/>
   </Target>
 
   <Target Name="Prepare" DependsOnTargets="PrepareV1">
   </Target>
 
-  <Target Name="FindBinlogs" Outputs="%(BuildableRepository.Identity)">
+  <Target Name="FindBinlogs" Condition="$(HasBuildableRepos)" Outputs="%(BuildableRepository.Identity)">
     <ItemGroup>
       <_BinlogToIndexTemp Remove="@(_BinlogToIndexTemp)" />
       <_BinlogToIndexTemp Include="%(BuildableRepository.LocalPath)\**\*.binlog" Repository="%(BuildableRepository.Identity)"/>
@@ -166,7 +187,7 @@
 
   </Target>
 
-  <Target Name="FindSolutions" Outputs="%(ExtractedRepository.Identity)">
+  <Target Name="FindSolutions" Condition="$(HasExtractedRepos)" Outputs="%(ExtractedRepository.Identity)">
     <ItemGroup>
       <_SolutionToIndexTemp Remove="@(_SolutionToIndexTemp)" />
     </ItemGroup>
@@ -180,7 +201,7 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="AnalyzeV1" DependsOnTargets="FindBinLogs;FindSolutions" Outputs="%(Repository.Identity)">
+  <Target Name="AnalyzeV1" Condition="$(HasRepos)" DependsOnTargets="FindBinLogs;FindSolutions" Outputs="%(Repository.Identity)">
     <PropertyGroup>
       <BaseCodexCmd>"$(CodexExePath)" analyze --clean --test</BaseCodexCmd>
       <RepoName>%(Repository.Identity)</RepoName>
