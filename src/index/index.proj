@@ -32,14 +32,19 @@
     </RepositoryV2>
   </ItemDefinitionGroup>
 
+
+  <Target Name="EnsurePreconditions">
+    <Error Condition="'$(OS)' != 'Windows_NT'" Text="This tool can only be run on Windows_NT."/>
+
+    
   <ItemGroup>
+    <Repository Remove="@(Repository)" Condition="'%(Identity)' != '$(SelectedRepository)' AND '$(SelectedRepository)' != ''" />
+    <RepositoryV2 Remove="@(RepositoryV2)" Condition="'%(Identity)' != '$(SelectedRepository)' AND '$(SelectedRepository)' != ''" />
+
     <BuildableRepository Include="@(Repository)" />
     <ExtractedRepository Include="@(RepositoryV2)" />
     <Repository Include="@(RepositoryV2)" />
   </ItemGroup>
-
-  <Target Name="EnsurePreconditions">
-    <Error Condition="'$(OS)' != 'Windows_NT'" Text="This tool can only be run on Windows_NT."/>
   </Target>
 
   <Target Name="Clean">
@@ -213,7 +218,7 @@
     <Error Condition="!Exists('$(CodexExePath)')" Text="Codex executable not found."/>
     <Exec Command="$(SourceIndexCmd)" Condition="$(ShouldAnalyze)" LogStandardErrorAsError="false"/>
 
-    <ZipDirectory Condition="'$(_AnalyzeUploadDir)' != ''" SourceDirectory="$(ThisRepoAnalyzeOutDir)" DestinationFile="$(_AnalyzeUploadDir)" />
+    <ZipDirectory Condition="'$(_AnalyzeUploadDir)' != ''" SourceDirectory="$(ThisRepoAnalyzeOutDir)" DestinationFile="$(_AnalyzeUploadDir)\%(Repository.Identity).zip" />
   </Target>
 
   <Target Name="Analyze" DependsOnTargets="AnalyzeV1" />
