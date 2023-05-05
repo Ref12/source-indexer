@@ -40,7 +40,7 @@
       <AgentJobCount Condition="'$(AgentJobCount)' == ''">1</AgentJobCount>
     </PropertyGroup>
     
-    <SelectGroup Inputs="@(Repository);@(RepositoryV2)" Name="$(SelectedRepoName)" GroupNumber="$(AgentJobNumber)" TotalGroups="$(AgentJobCount)">
+    <SelectGroup Inputs="@(Repository);@(RepositoryV2)" Name="$(SelectedRepoName)" AllNames="$(AllRepoNames)" GroupNumber="$(AgentJobNumber)" TotalGroups="$(AgentJobCount)">
       <Output TaskParameter="Outputs" ItemName="_GroupRepositories" />
     </SelectGroup>
     

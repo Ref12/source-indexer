@@ -26,6 +26,11 @@ namespace Microsoft.SourceIndexer.Tasks
         public string Name { get; set; }
 
         /// <summary>
+        /// The name of the repository to select
+        /// </summary>
+        public string[] AllNames { get; set; }
+
+        /// <summary>
         /// Total number of groups
         /// </summary>
         [Required]
@@ -55,18 +60,36 @@ namespace Microsoft.SourceIndexer.Tasks
         {
             Outputs = new TaskItem[Inputs.Length];
 
+            this.Log.LogMessage(MessageImportance.High, $"All repos: '{string.Join(";", Inputs.Select(i => i.ItemSpec))}'");
+            var allNames = new HashSet<string>(AllNames ?? new string[0], StringComparer.OrdinalIgnoreCase);
+
             for (int i = 0; i < Inputs.Length; i++)
             {
                 var input = Inputs[i];
-                bool selected = string.IsNullOrEmpty(Name)
-                    ? (i % TotalGroups) == (GroupNumber - 1)
-                    : string.Equals(Name, input.ItemSpec, StringComparison.OrdinalIgnoreCase);
+                bool selected = IsSelected(i, input, allNames);
                 var output = new TaskItem(input);
 
                 output.SetMetadata("IsSelected", selected ? "true" : "false");
                 Outputs[i] = output;
                 Log.LogMessage(MessageImportance.High, $"{input.ItemSpec} (IsSelected: {selected})");
             }
+        }
+
+        private bool IsSelected(int i, ITaskItem input, HashSet<string> allNames)
+        {
+            if (!allNames.Contains(input.ItemSpec))
+            {
+                this.Log.LogWarning($"Found unregistered item: {input.ItemSpec}");
+
+                if (string.Equals(Name, "_other", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return string.IsNullOrEmpty(Name)
+                                ? (i % TotalGroups) == (GroupNumber - 1)
+                                : string.Equals(Name, input.ItemSpec, StringComparison.OrdinalIgnoreCase);
         }
     }
 }
