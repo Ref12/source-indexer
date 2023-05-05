@@ -28,7 +28,7 @@ namespace Microsoft.SourceIndexer.Tasks
         /// <summary>
         /// The name of the repository to select
         /// </summary>
-        public string[] AllNames { get; set; }
+        public string AllNames { get; set; }
 
         /// <summary>
         /// Total number of groups
@@ -60,8 +60,9 @@ namespace Microsoft.SourceIndexer.Tasks
         {
             Outputs = new TaskItem[Inputs.Length];
 
-            this.Log.LogMessage(MessageImportance.High, $"All repos: '{string.Join(";", Inputs.Select(i => i.ItemSpec))}'");
-            var allNames = new HashSet<string>(AllNames ?? new string[0], StringComparer.OrdinalIgnoreCase);
+            AllNames ??= "";
+            this.Log.LogMessage(MessageImportance.High, $"All repos: '{string.Join(",", Inputs.Select(i => i.ItemSpec))}'");
+            var allNames = new HashSet<string>(AllNames.Split(',') ?? new string[0], StringComparer.OrdinalIgnoreCase);
 
             for (int i = 0; i < Inputs.Length; i++)
             {
