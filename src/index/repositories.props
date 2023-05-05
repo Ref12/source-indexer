@@ -74,4 +74,8 @@
       </PrepareCommand>
     </Repository>
   </ItemGroup>
+
+  <Target Name="SetAllRepos">
+    <Message Importance="high" Text="##vso[task.setvariable variable=AllRepos]@(Repository, ', '),@(RepositoryV2, ', ')" />
+  </Target>
 </Project>

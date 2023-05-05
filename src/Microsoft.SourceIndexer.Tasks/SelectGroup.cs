@@ -21,6 +21,11 @@ namespace Microsoft.SourceIndexer.Tasks
         public int GroupNumber { get; set; }
 
         /// <summary>
+        /// The name of the repository to select
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
         /// Total number of groups
         /// </summary>
         [Required]
@@ -53,7 +58,9 @@ namespace Microsoft.SourceIndexer.Tasks
             for (int i = 0; i < Inputs.Length; i++)
             {
                 var input = Inputs[i];
-                bool selected = (i % TotalGroups) == (GroupNumber - 1);
+                bool selected = string.IsNullOrEmpty(Name)
+                    ? (i % TotalGroups) == (GroupNumber - 1)
+                    : string.Equals(Name, input.ItemSpec, StringComparison.OrdinalIgnoreCase);
                 var output = new TaskItem(input);
 
                 output.SetMetadata("IsSelected", selected ? "true" : "false");

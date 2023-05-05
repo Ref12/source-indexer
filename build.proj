@@ -29,6 +29,6 @@
     <MSBuild Projects="src/index/index.proj" Targets="Build" Properties="SourceIndexerTasksAssembly=$(SourceIndexerTasksAssembly)"/>
   </Target>
   <Target Name="SelectProjects" DependsOnTargets="BuildTasks">
-    <MSBuild Projects="src/index/index.proj" Targets="SelectProjects" Properties="SourceIndexerTasksAssembly=$(SourceIndexerTasksAssembly)"/>
+    <MSBuild Projects="src/index/index.proj" Targets="EnsurePreconditions" Properties="SourceIndexerTasksAssembly=$(SourceIndexerTasksAssembly)"/>
   </Target>
 </Project>

@@ -32,8 +32,6 @@
       <DisableMsBuildWorkspace>false</DisableMsBuildWorkspace>
     </RepositoryV2>
   </ItemDefinitionGroup>
-
-
   <Target Name="EnsurePreconditions" DependsOnTargets="PrepareOutput">
     <Error Condition="'$(OS)' != 'Windows_NT'" Text="This tool can only be run on Windows_NT."/>
 
@@ -41,8 +39,8 @@
       <AgentJobNumber Condition="'$(AgentJobNumber)' == ''">1</AgentJobNumber>
       <AgentJobCount Condition="'$(AgentJobCount)' == ''">1</AgentJobCount>
     </PropertyGroup>
-
-    <SelectGroup Inputs="@(Repository);@(RepositoryV2)" GroupNumber="$(AgentJobNumber)" TotalGroups="$(AgentJobCount)">
+    
+    <SelectGroup Inputs="@(Repository);@(RepositoryV2)" Name="$(SelectedRepoName)" GroupNumber="$(AgentJobNumber)" TotalGroups="$(AgentJobCount)">
       <Output TaskParameter="Outputs" ItemName="_GroupRepositories" />
     </SelectGroup>
     
