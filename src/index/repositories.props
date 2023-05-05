@@ -76,6 +76,6 @@
   </ItemGroup>
 
   <Target Name="SetAllRepos">
-    <Message Importance="high" Text="##vso[task.setvariable variable=AllRepos;isoutput=true]@(Repository, ', '),@(RepositoryV2, ', ')" />
+    <Message Importance="high" Text="##vso[task.setvariable variable=AllRepos;isSecret=false;isoutput=true]@(Repository, ', '),@(RepositoryV2, ', ')" />
   </Target>
 </Project>
