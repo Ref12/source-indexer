@@ -238,7 +238,9 @@
     <Error Condition="!Exists('$(CodexExePath)')" Text="Codex executable not found."/>
     <Exec Command="$(SourceIndexCmd)" Condition="$(ShouldAnalyze)" LogStandardErrorAsError="false"/>
 
-    <ZipDirectory Condition="'$(_AnalyzeUploadDir)' != ''" SourceDirectory="$(ThisRepoAnalyzeOutDir)" DestinationFile="$(_AnalyzeUploadDir)\%(Repository.Identity).zip" />
+    <Exec Command="codextask UploadOnly /AnalyzeOut:$(ThisRepoAnalyzeOutDir)" Condition="$(ShouldAnalyze)" LogStandardErrorAsError="false"/>
+
+    <!--<ZipDirectory Condition="'$(_AnalyzeUploadDir)' != ''" SourceDirectory="$(ThisRepoAnalyzeOutDir)" DestinationFile="$(_AnalyzeUploadDir)\%(Repository.Identity).zip" />-->
   </Target>
 
   <Target Name="Analyze" DependsOnTargets="AnalyzeV1" />
