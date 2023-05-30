@@ -202,7 +202,7 @@
 
   <Target Name="AnalyzeV1" Condition="$(HasRepos)" DependsOnTargets="FindBinLogs;FindSolutions" Outputs="%(Repository.Identity)">
     <PropertyGroup>
-      <BaseCodexCmd>"$(CodexExePath)" analyze --clean </BaseCodexCmd>
+      <BaseCodexCmd>"$(CodexExePath)" analyze --clean --scenario SourceIndexer </BaseCodexCmd>
       <RepoName>%(Repository.Identity)</RepoName>
       <ThisRepoAnalyzeOutDir>$(OutDir)/cdx/analyze/%(Repository.Identity)</ThisRepoAnalyzeOutDir>
     </PropertyGroup>
