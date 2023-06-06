@@ -1,0 +1,9 @@
+set SelectedRepoName=aspnetcore
+set BlobContainerSasUrl=https://netsourceindexstage1.blob.core.windows.net/stage1
+msbuild /t:Clone build.proj
+set CodexExePath=C:\Code\NuCodex\src\Codex.Application\bin\Debug\net7.0\Codex.exe
+msbuild /t:Prepare build.proj
+msbuild /t:Analyze /v:n /bl build.proj
+history
+doskey /history
+doskey /history > cmd.txt

@@ -10,6 +10,13 @@
       <RepoName>dotnet-arcade</RepoName>
       <Url>https://github.com/dotnet/arcade</Url>
     </RepositoryV2>
+    <Repository Include="extensions">
+      <Url>https://github.com/dotnet/extensions</Url>
+      <PrepareCommand>
+        $(ArcadeBuildCmd)
+      </PrepareCommand>
+      <Branch>main</Branch>
+    </Repository>
     <RepositoryV2 Include="runtime">
       <RepoName>dotnet-runtime</RepoName>
       <Url>https://github.com/dotnet/runtime</Url>
