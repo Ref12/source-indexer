@@ -17,6 +17,13 @@
       </PrepareCommand>
       <Branch>main</Branch>
     </Repository>
+    <Repository Include="interactive-window">
+      <Url>https://github.com/dotnet/interactive-window</Url>
+      <PrepareCommand>
+        $(ArcadeBuildCmd)
+      </PrepareCommand>
+      <Branch>main</Branch>
+    </Repository>
     <RepositoryV2 Include="runtime">
       <RepoName>dotnet-runtime</RepoName>
       <Url>https://github.com/dotnet/runtime</Url>
